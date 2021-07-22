@@ -1,0 +1,143 @@
+#!/usr/bin/bash
+LEE_SECONDS=5
+VALID_APPS="kbsvc birdsvc kb bird"
+
+## -----------------------------------------------------------------------------------
+## is_running: $1 - pid file
+## -----------------------------------------------------------------------------------
+function is_running {
+	if [[ -e $pid_file ]] ; then 
+		if ps -ef | grep $(cat $pid_file) ; then 
+			return 0
+		else 
+			return 1
+		fi
+	else
+		return 1
+	fi
+}
+
+## -----------------------------------------------------------------------------------
+## validate_pid: $1 pid 
+## -----------------------------------------------------------------------------------
+function validate_pid {
+	echo $1 | tee ${pid_file} | xargs echo "shell process id: "
+	sleep $LEE_SECONDS 
+	if ! is_running $pid_file; then 
+		echo 'unable to start $app_name'
+	fi
+}
+## -----------------------------------------------------------------------------------
+## start_node_app 
+## -----------------------------------------------------------------------------------
+function start_node_app {
+	if cd $app_name ; then 
+		npm start > ../${log_file} 2>&1 &
+		cd - > /dev/null
+		pid=$!
+		validate_pid $pid
+	else
+		echo "$app_name does not exist."
+		exit 1
+	fi
+}
+
+## -----------------------------------------------------------------------------------
+## start_node_app 
+## -----------------------------------------------------------------------------------
+function start_jar_app {
+	
+	if [[ -e jar/${app_name}.jar ]]; then 
+		case $app_name in 
+			kbsvc ) 
+				export DB_HOST=BobsXps
+				export DB_USER=kb_svc
+				export DB_PSWD=Evdt1234
+				;;
+		esac
+		java -jar jar/${app_name}.jar > $log_file 2>&1 &
+		pid=$!
+		validate_pid $pid
+	else
+		echo "$app_name does not exist."
+		exit 1
+	fi
+}
+## -----------------------------------------------------------------------------------
+##			M A I N 
+## -----------------------------------------------------------------------------------
+function main {
+  case $action in 
+	start ) if is_running $pid_file; then 
+			echo "$app_name is already running"
+		else
+			case $app_name in 
+				kb | bird ) 
+					start_node_app ;;	
+				kbsvc | birdsvc ) 
+					start_jar_app ;; 
+				* ) 	
+					echo "valid apps: $VALID_APPS" 
+					exit 1
+			esac
+		fi
+	;;
+	status ) if is_running $pid_file ; then 
+			echo "------------------------------------------------------------------------"
+			echo "running."
+		else
+			echo "------------------------------------------------------------------------"
+			echo "NOT running."
+		fi
+	;;
+	stop )	if is_running $pid_file  ; then 
+			echo "killing $app_name processes......"
+			ps -ef | grep $(cat $pid_file) | awk '{ print $2 }' | xargs kill | tee
+			sleep $LEE_SECONDS
+			if is_running $pid_file; then 
+				echo 'unable to kill......'
+			fi
+		else
+			echo "$app_name is NOT running."
+		fi
+	;;
+	* ) 	echo "valid actions: start | status | stop "
+		exit 1
+	;;
+  esac
+}
+
+## 
+## R U N 
+##
+
+action=${1?missing action}
+case $action in 
+	status ) app_name=${2-all} ;;
+	* ) app_name=${2?missing app name} ;;
+esac
+
+case $app_name in 
+	all )
+		for app in $VALID_APPS ; do
+			app_name=$app
+			pid_file=${app}.pid
+			log_file=${app}.log
+			echo "$app_name"
+			echo "------------------------------------------------------------------------"
+			main
+			echo
+		done
+		;;
+	* ) 
+		if echo $VALID_APPS | grep $app_name > /dev/null; then
+			pid_file=${app_name}.pid
+			log_file=${app_name}.log
+			echo "app_name=$app_name pid_file=$pid_file log_file=$log_file"
+			main 
+		else
+			echo "valid apps are: $VALID_APPS"
+		fi
+		;;
+esac
+
