@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 LEE_SECONDS=5
-VALID_APPS="kbsvc birdsvc kb bird"
+VALID_APPS="services kb bird"
 
 ## -----------------------------------------------------------------------------------
 ## is_running: $1 - pid file
@@ -43,23 +43,16 @@ function start_node_app {
 }
 
 ## -----------------------------------------------------------------------------------
-## start_node_app 
+## start_services 
 ## -----------------------------------------------------------------------------------
-function start_jar_app {
-	
-	if [[ -e jar/${app_name}.jar ]]; then 
-		case $app_name in 
-			kbsvc ) 
-				export DB_HOST=BobsXps
-				export DB_USER=kb_svc
-				export DB_PSWD=Evdt1234
-				;;
-		esac
-		java -jar jar/${app_name}.jar > $log_file 2>&1 &
+function start_services {
+	if [[ -e jar/services.jar ]]; then 
+		. services.env
+		java -jar jar/services.jar > $log_file 2>&1 &
 		pid=$!
 		validate_pid $pid
 	else
-		echo "$app_name does not exist."
+		echo "services does not exist."
 		exit 1
 	fi
 }
@@ -74,8 +67,8 @@ function main {
 			case $app_name in 
 				kb | bird ) 
 					start_node_app ;;	
-				kbsvc | birdsvc ) 
-					start_jar_app ;; 
+				services) 
+					start_services ;; 
 				* ) 	
 					echo "valid apps: $VALID_APPS" 
 					exit 1
