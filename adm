@@ -3,6 +3,7 @@ LEEWAY_SECONDS=5
 VALID_APPS="svc notes bird rgscalc wfmon flappy"
 
 ########## TODO: npm status stop not working properly. need lps to get to the bottom of the process
+########## TODO: feature: auto restart 
 
 ## -----------------------------------------------------------------------------------
 ## is_running
