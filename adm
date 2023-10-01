@@ -1,13 +1,13 @@
 #!/usr/bin/bash
-LEE_SECONDS=5
-VALID_APPS="services kb bird"
+LEEWAY_SECONDS=5
+VALID_APPS="svc notes bird rgscalc wfmon flappy"
 
 ## -----------------------------------------------------------------------------------
-## is_running: $1 - pid file
+## is_running
 ## -----------------------------------------------------------------------------------
 function is_running {
 	if [[ -e $pid_file ]] ; then 
-		if ps -ef | grep $(cat $pid_file) ; then 
+		if ps -ef | grep $(cat $pid_file) | grep -v grep ; then 
 			return 0
 		else 
 			return 1
@@ -18,30 +18,60 @@ function is_running {
 }
 
 ## -----------------------------------------------------------------------------------
-## validate_pid: $1 pid 
+## validate_pid
 ## -----------------------------------------------------------------------------------
 function validate_pid {
-	echo $1 | tee ${pid_file} | xargs echo "shell process id: "
-	sleep $LEE_SECONDS 
-	if ! is_running $pid_file; then 
+	echo $pid | tee ${pid_file} | xargs echo "shell process id: "
+	sleep $LEEWAY_SECONDS 
+	if ! is_running ; then 
 		echo 'unable to start $app_name'
 	fi
 }
 ## -----------------------------------------------------------------------------------
-## start_node_app 
+## get_port
 ## -----------------------------------------------------------------------------------
-function start_node_app {
-	if cd $app_name ; then 
-		npm start > ../${log_file} 2>&1 &
+function get_port { 
+ 	case $app_name in 
+		svc 	) PORT=3000 ;;
+		bird 	) PORT=3001 ;;
+		notes 	) PORT=3002 ;;
+		rgscalc ) PORT=3003 ;;
+		wfmon	) PORT=3004 ;;
+		flappy	) PORT=2001 ;;
+	esac
+	export $PORT
+}
+## -----------------------------------------------------------------------------------
+## start_node_app_use_serve 
+## -----------------------------------------------------------------------------------
+function start_node_app_use_serve {
+	get_port
+	if -e $app_name ; then 
+		serve -s $app_name -l $PORT > ../${log_file} 2>&1 &
 		cd - > /dev/null
 		pid=$!
-		validate_pid $pid
+		validate_pid 
 	else
 		echo "$app_name does not exist."
 		exit 1
 	fi
 }
-
+## -----------------------------------------------------------------------------------
+## start_node_app_use_npm 
+## -----------------------------------------------------------------------------------
+function start_node_app_use_npm {
+	NODE_ENV=production
+	get_port
+	if cd $app_name ; then 
+		npm start > ../${log_file} 2>&1 &
+		cd - > /dev/null
+		pid=$!
+		validate_pid 
+	else
+		echo "$app_name does not exist."
+		exit 1
+	fi
+}
 ## -----------------------------------------------------------------------------------
 ## start_services 
 ## -----------------------------------------------------------------------------------
@@ -60,14 +90,20 @@ function start_services {
 ##			M A I N 
 ## -----------------------------------------------------------------------------------
 function main {
+  pid_file=${app_name}.pid
+  log_file=${app_name}.log
+  echo "app_name=$app_name pid_file=$pid_file log_file=$log_file"
+
   case $action in 
-	start ) if is_running $pid_file; then 
+	start ) if is_running ; then 
 			echo "$app_name is already running"
 		else
 			case $app_name in 
-				kb | bird ) 
-					start_node_app ;;	
-				services) 
+				notes | bird | rgscalc | wfmon ) 
+					start_node_app_use_serve ;;	
+				flappy ) 
+					start_node_app_use_npm ;;	
+				svc ) 
 					start_services ;; 
 				* ) 	
 					echo "valid apps: $VALID_APPS" 
@@ -75,20 +111,23 @@ function main {
 			esac
 		fi
 	;;
-	status ) if is_running $pid_file ; then 
-			echo "------------------------------------------------------------------------"
+	status ) if is_running ; then 
+			echo "-------------------------------"
 			echo "running."
 		else
-			echo "------------------------------------------------------------------------"
+			echo "-------------------------------"
 			echo "NOT running."
 		fi
+		echo "------------------------------------------------------------------------"
 	;;
-	stop )	if is_running $pid_file  ; then 
+	stop )	if is_running ; then 
 			echo "killing $app_name processes......"
 			ps -ef | grep $(cat $pid_file) | awk '{ print $2 }' | xargs kill | tee
-			sleep $LEE_SECONDS
-			if is_running $pid_file; then 
+			sleep $LEEWAY_SECONDS
+			if is_running ; then 
 				echo 'unable to kill......'
+			else
+				rm -f $pid_file
 			fi
 		else
 			echo "$app_name is NOT running."
@@ -106,27 +145,21 @@ function main {
 
 action=${1?missing action}
 case $action in 
-	status ) app_name=${2-all} ;;
-	* ) app_name=${2?missing app name} ;;
+	status ) app_name=${2-all} ;;		### status works with one app or all apps (not specify = all)
+	* ) app_name=${2?missing app name} ;;  	### start/stop only works with one app at a time 
 esac
 
 case $app_name in 
 	all )
 		for app in $VALID_APPS ; do
 			app_name=$app
-			pid_file=${app}.pid
-			log_file=${app}.log
-			echo "$app_name"
-			echo "------------------------------------------------------------------------"
-			main
-			echo
+			echo main $action $app_name
+			main 
 		done
 		;;
 	* ) 
 		if echo $VALID_APPS | grep $app_name > /dev/null; then
-			pid_file=${app_name}.pid
-			log_file=${app_name}.log
-			echo "app_name=$app_name pid_file=$pid_file log_file=$log_file"
+			echo main $action $app_name
 			main 
 		else
 			echo "valid apps are: $VALID_APPS"
