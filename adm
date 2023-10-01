@@ -28,7 +28,15 @@ function validate_pid {
 	echo $pid | tee ${pid_file} | xargs echo "shell process id: "
 	sleep $LEEWAY_SECONDS 
 	if ! is_running ; then 
-		echo 'unable to start $app_name'
+		echo "give another $LEEWAY_SECONDS seconds!"
+		sleep $LEEWAY_SECONDS
+		if ! is_running ; then 
+			echo "give last $LEEWAY_SECONDS seconds!"
+			sleep $LEEWAY_SECONDS
+			if ! is_running; then 
+				echo 'unable to start $app_name'
+			fi
+		fi
 	fi
 }
 ## -----------------------------------------------------------------------------------
@@ -48,7 +56,7 @@ function get_port {
 ## -----------------------------------------------------------------------------------
 function start_node_app_use_serve {
 	get_port
-	if [[ -e $app_name ]]; then 
+	if [[ -e ${currdir}/$app_name ]]; then 
 		serve -s $app_name -l $PORT > ${log_file} 2>&1 &
 		cd - > /dev/null
 		pid=$!
@@ -147,10 +155,7 @@ function main {
 
 currdir=$(pwd)
 action=${1?missing action}
-case $action in 
-	status ) app_name=${2-all} ;;		### status works with one app or all apps (not specify = all)
-	* ) app_name=${2?missing app name} ;;  	### start/stop only works with one app at a time 
-esac
+app_name=${2-all}
 
 case $app_name in 
 	all )
