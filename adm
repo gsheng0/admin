@@ -2,6 +2,8 @@
 LEEWAY_SECONDS=5
 VALID_APPS="svc notes bird rgscalc wfmon flappy"
 
+########## TODO: npm status stop not working properly. need lps to get to the bottom of the process
+
 ## -----------------------------------------------------------------------------------
 ## is_running
 ## -----------------------------------------------------------------------------------
@@ -21,6 +23,7 @@ function is_running {
 ## validate_pid
 ## -----------------------------------------------------------------------------------
 function validate_pid {
+	echo $pid $(pwd) ${pid_file}
 	echo $pid | tee ${pid_file} | xargs echo "shell process id: "
 	sleep $LEEWAY_SECONDS 
 	if ! is_running ; then 
@@ -32,22 +35,20 @@ function validate_pid {
 ## -----------------------------------------------------------------------------------
 function get_port { 
  	case $app_name in 
-		svc 	) PORT=3000 ;;
-		bird 	) PORT=3001 ;;
-		notes 	) PORT=3002 ;;
-		rgscalc ) PORT=3003 ;;
-		wfmon	) PORT=3004 ;;
-		flappy	) PORT=2001 ;;
+		bird 	) export PORT=3001 ;;
+		notes 	) export PORT=3002 ;;
+		rgscalc ) export PORT=3003 ;;
+		wfmon	) export PORT=3004 ;;
+		flappy	) export PORT=2001 ;;
 	esac
-	export $PORT
 }
 ## -----------------------------------------------------------------------------------
 ## start_node_app_use_serve 
 ## -----------------------------------------------------------------------------------
 function start_node_app_use_serve {
 	get_port
-	if -e $app_name ; then 
-		serve -s $app_name -l $PORT > ../${log_file} 2>&1 &
+	if [[ -e $app_name ]]; then 
+		serve -s $app_name -l $PORT > ${log_file} 2>&1 &
 		cd - > /dev/null
 		pid=$!
 		validate_pid 
@@ -63,7 +64,7 @@ function start_node_app_use_npm {
 	NODE_ENV=production
 	get_port
 	if cd $app_name ; then 
-		npm start > ../${log_file} 2>&1 &
+		npm start > ${log_file} 2>&1 &
 		cd - > /dev/null
 		pid=$!
 		validate_pid 
@@ -76,9 +77,9 @@ function start_node_app_use_npm {
 ## start_services 
 ## -----------------------------------------------------------------------------------
 function start_services {
-	if [[ -e jar/services.jar ]]; then 
-		. services.env
-		java -jar jar/services.jar > $log_file 2>&1 &
+	if [[ -e svc/services.jar ]]; then 
+		. svc.env
+		java -jar $app_name/services.jar > $log_file 2>&1 &
 		pid=$!
 		validate_pid $pid
 	else
@@ -90,8 +91,8 @@ function start_services {
 ##			M A I N 
 ## -----------------------------------------------------------------------------------
 function main {
-  pid_file=${app_name}.pid
-  log_file=${app_name}.log
+  pid_file=${currdir}/${app_name}.pid
+  log_file=${currdir}/${app_name}.log
   echo "app_name=$app_name pid_file=$pid_file log_file=$log_file"
 
   case $action in 
@@ -133,7 +134,7 @@ function main {
 			echo "$app_name is NOT running."
 		fi
 	;;
-	* ) 	echo "valid actions: start | status | stop "
+	* ) 	echo "valid actions: start | status | s/top "
 		exit 1
 	;;
   esac
@@ -143,6 +144,7 @@ function main {
 ## R U N 
 ##
 
+currdir=$(pwd)
 action=${1?missing action}
 case $action in 
 	status ) app_name=${2-all} ;;		### status works with one app or all apps (not specify = all)
@@ -153,13 +155,13 @@ case $app_name in
 	all )
 		for app in $VALID_APPS ; do
 			app_name=$app
-			echo main $action $app_name
+			##echo main $action $app_name
 			main 
 		done
 		;;
 	* ) 
 		if echo $VALID_APPS | grep $app_name > /dev/null; then
-			echo main $action $app_name
+			##echo main $action $app_name
 			main 
 		else
 			echo "valid apps are: $VALID_APPS"
