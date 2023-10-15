@@ -2,7 +2,6 @@
 LEEWAY_SECONDS=5
 VALID_APPS="svc notes bird rgscalc wfmon flappy"
 
-########## TODO: npm status stop not working properly. need lps to get to the bottom of the process
 ########## TODO: feature: auto restart 
 
 ## -----------------------------------------------------------------------------------
@@ -19,24 +18,45 @@ function is_running {
 		return 1
 	fi
 }
-
+## -----------------------------------------------------------------------------------
+## get_spawn_pid - $1 pid  
+##
+## e.g. npm start => react-scripts start => node react-scripts => node react-scripts/scripts/start.js
+## 10574       1  npm start
+## 10591   10574  sh -c export PORT=2001 && react-scripts start
+## 10592   10591  node /home/gsapp/ps-games/v2flappy/node_modules/.bin/react-scripts start
+## 10599   10592  /usr/bin/node /home/gsapp/ps-games/v2flappy/node_modules/react-scripts/scripts/start.js
+##
+## -----------------------------------------------------------------------------------
+function get_spawn_pid {
+  typeset parent_pid=${1}
+  typeset curr_bottom_pid=$(lps $parent_pid | awk '{print $2}' |  tail -1)
+   
+} 
 ## -----------------------------------------------------------------------------------
 ## validate_pid
 ## -----------------------------------------------------------------------------------
 function validate_pid {
-	echo $pid $(pwd) ${pid_file}
-	echo $pid | tee ${pid_file} | xargs echo "shell process id: "
-	sleep $LEEWAY_SECONDS 
-	if ! is_running ; then 
-		echo "give another $LEEWAY_SECONDS seconds!"
-		sleep $LEEWAY_SECONDS
-		if ! is_running ; then 
-			echo "give last $LEEWAY_SECONDS seconds!"
-			sleep $LEEWAY_SECONDS
-			if ! is_running; then 
-				echo 'unable to start $app_name'
-			fi
-		fi
+	start_pid=${pid}
+	while true; do
+		echo sleep $LEEWAY_SECONDS seconds then check if anything spawned
+		sleep $LEEWAY_SECONDS 
+		top_pid=$(lps ${start_pid} | awk '{print $2}' | head -1)
+		bottom_pid=$(lps ${start_pid} | awk '{print $2}' | tail -1)
+		if [[ "${top_pid}" == "${bottom_pid}" ]]; then
+			echo "no spawned process seen, stopping polling......"
+			break;
+		else
+			echo "got spawn_pid=${bottom_pid} from pid=${pid}"
+			start_pid=${bottom_pid}
+		fi; 
+  	done 
+	echo ${pid} ==> ${bottom_pid} $(pwd) ${pid_file}
+	if [[ "${top_pid}" == "" ]]; then
+		echo "unable to start ${app_name}";
+	else
+		echo "${app_name} started with effectve pid=${bottom_pid}"
+		echo ${bottom_pid} > ${pwd}/${pid_file}
 	fi
 }
 ## -----------------------------------------------------------------------------------
@@ -58,7 +78,6 @@ function start_node_app_use_serve {
 	get_port
 	if [[ -e ${currdir}/$app_name ]]; then 
 		serve -s $app_name -l $PORT > ${log_file} 2>&1 &
-		cd - > /dev/null
 		pid=$!
 		validate_pid 
 	else
@@ -74,8 +93,8 @@ function start_node_app_use_npm {
 	get_port
 	if cd $app_name ; then 
 		npm start > ${log_file} 2>&1 &
-		cd - > /dev/null
 		pid=$!
+		cd - > /dev/null
 		validate_pid 
 	else
 		echo "$app_name does not exist."
@@ -181,6 +200,6 @@ case $app_name in
 esac
 
 if echo $action | grep status > /dev/null ; then 
-	netstat -tnlp
+	netstat -tnlp | egrep "node|java" | awk '{print $1, $4, $7}'
 fi
 
