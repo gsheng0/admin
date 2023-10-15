@@ -143,7 +143,12 @@ function main {
 			echo "$app_name is NOT running."
 		fi
 	;;
-	* ) 	echo "valid actions: start | status | s/top "
+	bounce ) action=stop
+		 main
+		 action=start
+		 main
+		 ;; 
+	* ) 	echo "valid actions: start | status | stop | bounce"
 		exit 1
 	;;
   esac
@@ -174,4 +179,8 @@ case $app_name in
 		fi
 		;;
 esac
+
+if echo $action | grep status > /dev/null ; then 
+	netstat -tnlp
+fi
 
