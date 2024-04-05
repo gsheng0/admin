@@ -128,10 +128,10 @@ function main {
 			echo "$app_name is already running"
 		else
 			case $app_name in 
-				notes | bird | rgscalc | wfmon ) 
+				notes | bird | rgscalc | wfmon | flappy ) 
 					start_node_app_use_serve ;;	
-				flappy ) 
-					start_node_app_use_npm ;;	
+			#	flappy ) 
+			#		start_node_app_use_npm ;;	
 				svc ) 
 					start_services ;; 
 				* ) 	
